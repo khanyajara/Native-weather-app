@@ -60,7 +60,7 @@ export const styles = StyleSheet.create({
         
     },
     WeatherInfo: {
-        marginTop:20,
+        marginTop:-190,
         alignItems: 'center',
         width: '50%'
     },

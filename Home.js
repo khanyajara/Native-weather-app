@@ -1,36 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator, Image, FlatList, ScrollView } from 'react-native';
+import axios from 'axios';
 import * as Location from 'expo-location';
 
 const HomePage = () => {
   const [weatherData, setWeatherData] = useState(null);
-  const [forecastData, setForecastData] = useState(null);
+  const [forecastData, setForecastData] = useState([]);
+  const [dailyForecastData, setDailyForecastData] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [showForecast, setShowForecast] = useState(false);
+  const [backgroundColor, setBackgroundColor] = useState('#ffffff');
 
   useEffect(() => {
     const fetchWeatherData = async (latitude, longitude) => {
       const openWeatherApiKey = '86ecfccfc21a432583678761d8148f45';
-      const weatherbitApiKey = '811df5b68bc44673bde4a8999e683deb';
-
       const openWeatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${openWeatherApiKey}`;
-      const weatherbitUrl = `https://api.weatherbit.io/v2.0/forecast/daily?lat=${latitude}&lon=${longitude}&key=${weatherbitApiKey}`;
+      const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=${openWeatherApiKey}`;
 
       try {
-        const [weatherResponse, forecastResponse] = await Promise.all([
-          fetch(openWeatherUrl),
-          fetch(weatherbitUrl),
-        ]);
+        const weatherResponse = await axios.get(openWeatherUrl);
+        const forecastResponse = await axios.get(forecastUrl);
 
-        if (!weatherResponse.ok) throw new Error('Failed to fetch current weather');
-        if (!forecastResponse.ok) throw new Error('Failed to fetch 7-day forecast');
+        if (weatherResponse.data && forecastResponse.data) {
+          setWeatherData(weatherResponse.data);
 
-        const weather = await weatherResponse.json();
-        const forecast = await forecastResponse.json();
+          // Get the current time
+          const currentTime = new Date().getHours();
+          const intervalsRemaining = Math.floor((24 - currentTime) / 3);  // Calculate how many 3-hour intervals are left for the day
 
-        setWeatherData(weather);
-        setForecastData(forecast.data.slice(0, 7));
+          // Slice the forecast for the remaining time intervals
+          setForecastData(forecastResponse.data.list.slice(0, intervalsRemaining));
+
+          // Get 5-day forecast (data is in 3-hour intervals, group them by day)
+          const dailyData = forecastResponse.data.list.reduce((acc, item) => {
+            const day = new Date(item.dt * 1000).getDate(); // Get the day part of the timestamp
+            if (!acc[day]) acc[day] = [];
+            acc[day].push(item);
+            return acc;
+          }, {});
+
+          // Get the first 5 days of the forecast (use at most 5 days)
+          setDailyForecastData(Object.values(dailyData).slice(0, 5));
+
+          updateBackgroundColor(weatherResponse.data.weather[0].main.toLowerCase());
+        } else {
+          setError('Failed to fetch weather data');
+        }
+
         setLoading(false);
       } catch (err) {
         setError(err.message);
@@ -58,6 +74,29 @@ const HomePage = () => {
     getLocationAndFetchWeather();
   }, []);
 
+  const updateBackgroundColor = (weatherCondition) => {
+    switch (weatherCondition) {
+      case 'clear':
+        setBackgroundColor('#87ceeb');
+        break;
+      case 'clouds':
+        setBackgroundColor('#d3d3d3');
+        break;
+      case 'rain':
+      case 'drizzle':
+        setBackgroundColor('#a9a9a9');
+        break;
+      case 'thunderstorm':
+        setBackgroundColor('#696969');
+        break;
+      case 'snow':
+        setBackgroundColor('#ffffff');
+        break;
+      default:
+        setBackgroundColor('#add8e6');
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.content}>
@@ -67,47 +106,69 @@ const HomePage = () => {
   }
 
   return (
-    <View style={styles.content}>
+    <View style={[styles.content, { backgroundColor }]}>
       {error ? (
         <Text style={styles.error}>{error}</Text>
       ) : (
-        <View>
-          <View style={styles.weatherCard}>
-            <Text style={styles.title}>Weather in {weatherData.name}</Text>
-            <Text style={styles.info}>
-              Temperature: {(weatherData.main.temp - 273.15).toFixed(1)}°C
-            </Text>
-            <Text style={styles.info}>Condition: {weatherData.weather[0].description}</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.forecastButton}
-            onPress={() => setShowForecast(!showForecast)}
-          >
-            <Text style={styles.forecastButtonText}>
-              {showForecast ? 'Hide 7-Day Forecast' : 'Show 7-Day Forecast'}
-            </Text>
-          </TouchableOpacity>
-
-          {showForecast && (
-            <View style={styles.forecastContainer}>
-              {forecastData.map((day, index) => (
-                <View key={index} style={styles.forecastCard}>
-                  <Text style={styles.forecastDay}>
-                    {new Date(day.ts * 1000).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                    })}
-                  </Text>
-                  <Text style={styles.forecastTemp}>
-                    Max: {day.max_temp.toFixed(1)}°C, Min: {day.min_temp.toFixed(1)}°C
-                  </Text>
-                  <Text style={styles.forecastCondition}>{day.weather.description}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+        <View style={styles.weatherCard}>
+          <Text style={styles.title}>Weather in {weatherData.name}</Text>
+          <Text style={styles.info}>
+            Temperature: {(weatherData.main.temp - 273.15).toFixed(1)}°C
+          </Text>
+          <Text style={styles.info}>Condition: {weatherData.weather[0].description}</Text>
+          <Image
+            style={styles.weatherIcon}
+            source={{
+              uri: `https://openweathermap.org/img/wn/${weatherData.weather[0].icon}@4x.png`,
+            }}
+          />
         </View>
       )}
+
+      <Text style={styles.subtitle}>3-Hour Forecast for the Rest of the Day</Text>
+      <ScrollView horizontal style={styles.forecastContainer}>
+        {forecastData.map((item) => {
+          const time = new Date(item.dt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return (
+            <View style={styles.forecastCard} key={item.dt}>
+              <Text style={styles.forecastTime}>{time}</Text>
+              <Image
+                style={styles.forecastIcon}
+                source={{
+                  uri: `https://openweathermap.org/img/wn/${item.weather[0].icon}@2x.png`,
+                }}
+              />
+              <Text style={styles.forecastTemp}>
+                {(item.main.temp - 273.15).toFixed(1)}°C
+              </Text>
+              <Text style={styles.forecastCondition}>{item.weather[0].description}</Text>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      <Text style={styles.subtitle}>5-Day Forecast</Text>
+      <ScrollView horizontal style={styles.forecastContainer}>
+        {dailyForecastData.map((daily, index) => {
+          const dayName = new Date(daily[0].dt * 1000).toLocaleDateString([], { weekday: 'short' });
+          const temp = daily.reduce((acc, item) => acc + item.main.temp, 0) / daily.length;
+          return (
+            <View style={styles.forecastCard} key={index}>
+              <Text style={styles.forecastTime}>{dayName}</Text>
+              <Image
+                style={styles.forecastIcon}
+                source={{
+                  uri: `https://openweathermap.org/img/wn/${daily[0].weather[0].icon}@2x.png`,
+                }}
+              />
+              <Text style={styles.forecastTemp}>
+                {(temp - 273.15).toFixed(1)}°C
+              </Text>
+              <Text style={styles.forecastCondition}>{daily[0].weather[0].description}</Text>
+            </View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 };
@@ -146,28 +207,26 @@ const styles = StyleSheet.create({
     borderColor: '#0a0a0a',
     marginBottom: 10,
   },
-  forecastButton: {
-    marginVertical: 10,
-    padding: 10,
-    backgroundColor: '#2196F3',
-    borderRadius: 5,
-  },
-  forecastButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  weatherIcon: {
+    width: 100,
+    height: 100,
+    marginTop: 10,
   },
   forecastContainer: {
-    width: 330,
+    marginTop: 20,
+    marginBottom: 20,
   },
   forecastCard: {
     backgroundColor: 'rgba(18, 20, 20, 0.1)',
     padding: 10,
-    marginVertical: 5,
+    marginRight: 10,
+    width: 120,
+    alignItems: 'center',
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#0a0a0a',
   },
-  forecastDay: {
+  forecastTime: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#0a0a0a',
@@ -179,6 +238,18 @@ const styles = StyleSheet.create({
   forecastCondition: {
     fontSize: 12,
     color: '#0a0a0a',
+  },
+  forecastIcon: {
+    width: 40,
+    height: 40,
+    marginTop: 5,
+  },
+  subtitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0a0a0a',
+    marginTop: 20,
+    marginBottom: 10,
   },
 });
 
