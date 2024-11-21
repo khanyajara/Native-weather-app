@@ -16,14 +16,27 @@ const Weather = () => {
         'Cape Town', 'Johannesburg', 'Durban', 'Pretoria', 'Port Elizabeth',
     ]);
 
-    const GetWeather = () => {
-        getWeather(city, setWeatherData, setForecastData);
-        setNearbyCitiesVisible(false); // Hide nearby cities when fetching weather
+    const GetWeather = async () => {
+        try {
+            const data = await getWeather(city);
+            setWeatherData({
+                temperature: (data.main.temp - 273.15).toFixed(2),
+                description: data.weather[0].description,
+            });
+            setNearbyCitiesVisible(false); // Hide nearby cities when fetching weather
+        } catch (error) {
+            console.error("Error fetching weather data:", error);
+        }
     };
 
-    const GetForecast = () => {
-        getForecast(city, setWeatherData, setForecastData);
-        setNearbyCitiesVisible(false); // Hide nearby cities when fetching forecast
+    const GetForecast = async () => {
+        try {
+            const data = await getForecast(city);
+            setForecastData(data);
+            setNearbyCitiesVisible(false); // Hide nearby cities when fetching forecast
+        } catch (error) {
+            console.error("Error fetching forecast data:", error);
+        }
     };
 
     const clearScreen = () => {
@@ -36,24 +49,30 @@ const Weather = () => {
     const fetchWeatherForNearbyCities = async () => {
         const weatherData = {};
         for (const city of nearbyCities) {
-            // Fetch the weather for each city and store it in the state
-            const data = await getWeather(city);
-            weatherData[city] = data;
+            try {
+                const data = await getWeather(city);
+                weatherData[city] = {
+                    temperature: (data.main.temp - 273.15).toFixed(2),
+                    description: data.weather[0].description,
+                };
+            } catch (error) {
+                console.error(`Error fetching weather data for ${city}:`, error);
+            }
         }
         setNearbyCitiesWeather(weatherData);
     };
 
     useEffect(() => {
         if (nearbyCitiesVisible) {
-            fetchWeatherForNearbyCities(); // Fetch weather data for nearby cities when they're visible
+            fetchWeatherForNearbyCities(); 
         }
     }, [nearbyCitiesVisible]);
 
     return (
         <View style={styles.centeredContext}>
             <StatusBar style="light" />
-
             <Text style={styles.Title}>Weather App</Text>
+
             <TextInput
                 style={styles.input}
                 placeholder="Enter city name"
@@ -66,9 +85,7 @@ const Weather = () => {
                     onPress={GetWeather}
                     style={({ pressed }) => [
                         styles.button,
-                        {
-                            backgroundColor: pressed ? '#0d8581' : '#0d5f85',
-                        },
+                        { backgroundColor: pressed ? '#0d8581' : '#0d5f85' },
                     ]}
                 >
                     <Text style={styles.buttonText}>Weather</Text>
@@ -78,23 +95,18 @@ const Weather = () => {
                     onPress={GetForecast}
                     style={({ pressed }) => [
                         styles.button,
-                        {
-                            backgroundColor: pressed ? '#0d8581' : '#0d5f85',
-                        },
+                        { backgroundColor: pressed ? '#0d8581' : '#0d5f85' },
                     ]}
                 >
                     <Text style={styles.buttonText}>Forecast</Text>
                 </Pressable>
 
-                {/* Clear Button */}
                 {weatherData && (
                     <Pressable
                         onPress={clearScreen}
                         style={({ pressed }) => [
                             styles.button,
-                            {
-                                backgroundColor: pressed ? '#e74c3c' : '#c0392b',
-                            },
+                            { backgroundColor: pressed ? '#e74c3c' : '#c0392b' },
                         ]}
                     >
                         <Text style={styles.buttonText}>Clear</Text>
@@ -102,7 +114,6 @@ const Weather = () => {
                 )}
             </ScrollView>
 
-            {/* Display nearby cities */}
             {nearbyCitiesVisible && !weatherData && (
                 <View style={styles.nearbyCitiesContainer}>
                     <Text style={styles.heading}>Nearby Cities:</Text>
@@ -140,7 +151,6 @@ const Weather = () => {
             )}
 
             <ScrollView style={styles.scrollView}>
-                {/* Display Forecast Data */}
                 {forecastData && (
                     <View style={styles.WeatherInfo}>
                         <Text style={styles.heading}>Forecast for the next few hours: {'\n'}</Text>

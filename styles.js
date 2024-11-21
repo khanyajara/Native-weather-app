@@ -80,7 +80,7 @@ export const styles = StyleSheet.create({
     },
     weatherText: {
         color: '#0a0a0a',
-        fontSize:36,
+        fontSize:16,
         justifyContent: 'center',
         marginBottom: 8,
         flexDirection: 'column',

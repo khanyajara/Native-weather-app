@@ -24,22 +24,21 @@ const HomePage = () => {
         if (weatherResponse.data && forecastResponse.data) {
           setWeatherData(weatherResponse.data);
 
-          // Get the current time
+        
           const currentTime = new Date().getHours();
-          const intervalsRemaining = Math.floor((24 - currentTime) / 3);  // Calculate how many 3-hour intervals are left for the day
+          const intervalsRemaining = Math.floor((24 - currentTime) / 3);  
 
-          // Slice the forecast for the remaining time intervals
+         
           setForecastData(forecastResponse.data.list.slice(0, intervalsRemaining));
 
-          // Get 5-day forecast (data is in 3-hour intervals, group them by day)
           const dailyData = forecastResponse.data.list.reduce((acc, item) => {
-            const day = new Date(item.dt * 1000).getDate(); // Get the day part of the timestamp
+            const day = new Date(item.dt * 1000).getDate(); 
             if (!acc[day]) acc[day] = [];
             acc[day].push(item);
             return acc;
           }, {});
 
-          // Get the first 5 days of the forecast (use at most 5 days)
+          
           setDailyForecastData(Object.values(dailyData).slice(0, 5));
 
           updateBackgroundColor(weatherResponse.data.weather[0].main.toLowerCase());
